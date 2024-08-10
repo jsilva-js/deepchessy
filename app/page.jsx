@@ -1,6 +1,6 @@
 'use client'
 
-import Ground from '@/components/canvas/Ground'
+import Ground from '@/components/canvas/ground/Ground'
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
 
