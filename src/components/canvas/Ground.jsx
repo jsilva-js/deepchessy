@@ -1,16 +1,38 @@
 'use client'
-import React, { useMemo } from 'react'
-import { useThree } from '@react-three/fiber'
+
+import React, { useMemo, useRef, useState } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
-const GridSquare = ({ position, size }) => {
+const GridSquare = ({ position, size, gridX, gridZ }) => {
+  const [hovered, setHovered] = useState(false)
+  const meshRef = useRef()
+  const { camera, raycaster } = useThree()
+
   const geometry = useMemo(() => new THREE.PlaneGeometry(size, size), [size])
   const edgesGeometry = useMemo(() => new THREE.EdgesGeometry(geometry), [geometry])
 
+  useFrame(() => {
+    if (meshRef.current) {
+      const intersects = raycaster.intersectObject(meshRef.current)
+      if (intersects.length > 0) {
+        if (!hovered) setHovered(true)
+      } else if (hovered) {
+        setHovered(false)
+      }
+    }
+  })
+
+  const handleClick = (event) => {
+    event.stopPropagation()
+    console.log(`Clicked square at grid position: (${gridX}, ${gridZ})`)
+    console.log(`World position: (${position[0]}, ${position[1]}, ${position[2]})`)
+  }
+
   return (
-    <group position={position} rotation={[-Math.PI / 2, 0, 0]}>
-      <mesh geometry={geometry} receiveShadow>
-        <meshBasicMaterial color='black' side={THREE.DoubleSide} />
+    <group position={position} rotation={[-Math.PI / 2, 0, 0]} onClick={handleClick}>
+      <mesh ref={meshRef} geometry={geometry} receiveShadow>
+        <meshBasicMaterial color={hovered ? 'gray' : 'black'} side={THREE.DoubleSide} />
       </mesh>
       <lineSegments geometry={edgesGeometry}>
         <lineBasicMaterial color='white' linewidth={2} />
@@ -20,7 +42,12 @@ const GridSquare = ({ position, size }) => {
 }
 
 const Ground = ({ size = 8, tileSize = 1 }) => {
-  const { raycaster, camera, scene } = useThree()
+  const { raycaster, mouse, camera } = useThree()
+
+  useFrame(() => {
+    raycaster.setFromCamera(mouse, camera)
+  })
+
   const squares = useMemo(() => {
     const squaresArray = []
     for (let x = 0; x < size; x++) {
@@ -30,6 +57,8 @@ const Ground = ({ size = 8, tileSize = 1 }) => {
             key={`${x}-${z}`}
             position={[(x - size / 2 + 0.5) * tileSize, 0, (z - size / 2 + 0.5) * tileSize]}
             size={tileSize}
+            gridX={x}
+            gridZ={z}
           />,
         )
       }
@@ -37,27 +66,7 @@ const Ground = ({ size = 8, tileSize = 1 }) => {
     return squaresArray
   }, [size, tileSize])
 
-  const getIntersectingSquare = (x, y) => {
-    raycaster.setFromCamera(new THREE.Vector2(x, y), camera)
-    const intersects = raycaster.intersectObjects(scene.children, true)
-    return intersects.find((intersect) => intersect.object.parent?.userData?.isGridSquare)?.object.parent
-  }
-
-  return (
-    <group
-      userData={{ isGround: true }}
-      onClick={(event) => {
-        event.stopPropagation()
-        const square = getIntersectingSquare(event.clientX, event.clientY)
-        if (square) {
-          console.log('Clicked square at:', square.position)
-          // You can add more logic here, like moving a character
-        }
-      }}
-    >
-      {squares}
-    </group>
-  )
+  return <group userData={{ isGround: true }}>{squares}</group>
 }
 
 export default Ground
