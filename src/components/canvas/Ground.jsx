@@ -11,10 +11,7 @@ function Duck({ position, targetPosition }) {
 
   useFrame((state, delta) => {
     if (duckRef.current) {
-      // Rotate the duck
       duckRef.current.rotation.y += delta
-
-      // Move the duck smoothly towards the target position
       duckRef.current.position.x += (targetPosition[0] - duckRef.current.position.x) * 0.1
       duckRef.current.position.z += (targetPosition[2] - duckRef.current.position.z) * 0.1
     }
@@ -23,34 +20,15 @@ function Duck({ position, targetPosition }) {
   return <primitive ref={duckRef} object={scene} position={position} scale={[0.5, 0.5, 0.5]} />
 }
 
-const GridSquare = ({ position, size, gridX, gridZ, onClick, isCharacterHere, isSelected }) => {
-  const [hovered, setHovered] = useState(false)
+const GridSquare = ({ position, size, isCharacterHere, isSelected, isHovered }) => {
   const meshRef = useRef()
-  const { raycaster } = useThree()
-
   const geometry = useMemo(() => new THREE.PlaneGeometry(size, size), [size])
   const edgesGeometry = useMemo(() => new THREE.EdgesGeometry(geometry), [geometry])
 
-  useFrame(() => {
-    if (meshRef.current) {
-      const intersects = raycaster.intersectObject(meshRef.current)
-      if (intersects.length > 0) {
-        if (!hovered) setHovered(true)
-      } else if (hovered) {
-        setHovered(false)
-      }
-    }
-  })
-
-  const handleClick = (event) => {
-    event.stopPropagation()
-    onClick(gridX, gridZ)
-  }
-
-  const color = isSelected ? 'yellow' : isCharacterHere ? 'green' : hovered ? 'gray' : 'black'
+  const color = isSelected ? 'yellow' : isCharacterHere ? 'green' : isHovered ? 'gray' : 'black'
 
   return (
-    <group position={position} rotation={[-Math.PI / 2, 0, 0]} onClick={handleClick}>
+    <group position={position} rotation={[-Math.PI / 2, 0, 0]}>
       <mesh ref={meshRef} geometry={geometry} receiveShadow>
         <meshBasicMaterial color={color} side={THREE.DoubleSide} />
       </mesh>
@@ -62,30 +40,63 @@ const GridSquare = ({ position, size, gridX, gridZ, onClick, isCharacterHere, is
 }
 
 const Ground = ({ size = 8, tileSize = 1 }) => {
-  const { raycaster, mouse, camera } = useThree()
+  const { raycaster, mouse, camera, scene } = useThree()
   const [characterPosition, setCharacterPosition] = useState([0, 0])
   const [targetPosition, setTargetPosition] = useState([0, 0])
   const [selectedPosition, setSelectedPosition] = useState(null)
+  const [hoveredSquare, setHoveredSquare] = useState(null)
+
+  const groundRef = useRef()
+
+  const getGridPosition = (worldX, worldZ) => {
+    const gridX = Math.floor((worldX + (size * tileSize) / 2) / tileSize)
+    const gridZ = size - 1 - Math.floor((worldZ + (size * tileSize) / 2) / tileSize)
+    return [gridX, gridZ]
+  }
 
   useFrame(() => {
     raycaster.setFromCamera(mouse, camera)
+    const intersects = raycaster.intersectObjects(scene.children, true)
+
+    const planeIntersect = intersects.find((intersect) => intersect.object.parent?.parent === groundRef.current)
+
+    if (planeIntersect) {
+      const [gridX, gridZ] = getGridPosition(planeIntersect.point.x, planeIntersect.point.z)
+      if (gridX >= 0 && gridX < size && gridZ >= 0 && gridZ < size) {
+        setHoveredSquare([gridX, gridZ])
+      } else {
+        setHoveredSquare(null)
+      }
+    } else {
+      setHoveredSquare(null)
+    }
   })
 
-  const handleSquareClick = (x, z) => {
-    console.log('Clicked:', x, z)
-    console.log('Character at:', characterPosition)
-    console.log('Selected:', selectedPosition)
+  const handleClick = (event) => {
+    event.stopPropagation()
 
-    if (selectedPosition) {
-      // Set target position for smooth movement
-      setTargetPosition([x, z])
-      setSelectedPosition(null)
-    } else if (x === characterPosition[0] && z === characterPosition[1]) {
-      // Select character
-      setSelectedPosition([x, z])
-    } else {
-      // Deselect if clicking elsewhere
-      setSelectedPosition(null)
+    raycaster.setFromCamera(mouse, camera)
+    const intersects = raycaster.intersectObjects(scene.children, true)
+
+    const planeIntersect = intersects.find((intersect) => intersect.object.parent?.parent === groundRef.current)
+
+    if (planeIntersect) {
+      const [gridX, gridZ] = getGridPosition(planeIntersect.point.x, planeIntersect.point.z)
+
+      console.log('Clicked:', gridX, gridZ)
+      console.log('Character at:', characterPosition)
+      console.log('Selected:', selectedPosition)
+
+      if (gridX >= 0 && gridX < size && gridZ >= 0 && gridZ < size) {
+        if (selectedPosition) {
+          setTargetPosition([gridX, gridZ])
+          setSelectedPosition(null)
+        } else if (gridX === characterPosition[0] && gridZ === characterPosition[1]) {
+          setSelectedPosition([gridX, gridZ])
+        } else {
+          setSelectedPosition(null)
+        }
+      }
     }
   }
 
@@ -93,38 +104,32 @@ const Ground = ({ size = 8, tileSize = 1 }) => {
     const squaresArray = []
     for (let x = 0; x < size; x++) {
       for (let z = 0; z < size; z++) {
-        const position = [(x - size / 2 + 0.5) * tileSize, 0, (z - size / 2 + 0.5) * tileSize]
+        const position = [(x - size / 2 + 0.5) * tileSize, 0, (size - 1 - z - size / 2 + 0.5) * tileSize]
         squaresArray.push(
           <GridSquare
             key={`${x}-${z}`}
             position={position}
             size={tileSize}
-            gridX={x}
-            gridZ={z}
-            onClick={handleSquareClick}
             isCharacterHere={x === characterPosition[0] && z === characterPosition[1]}
             isSelected={selectedPosition && x === selectedPosition[0] && z === selectedPosition[1]}
+            isHovered={hoveredSquare && x === hoveredSquare[0] && z === hoveredSquare[1]}
           />,
         )
       }
     }
     return squaresArray
-  }, [size, tileSize, characterPosition, selectedPosition])
+  }, [size, tileSize, characterPosition, selectedPosition, hoveredSquare])
 
-  const characterWorldPosition = [
-    (characterPosition[0] - size / 2 + 0.5) * tileSize,
+  const getWorldPosition = (gridPosition) => [
+    (gridPosition[0] - size / 2 + 0.5) * tileSize,
     0.5,
-    (characterPosition[1] - size / 2 + 0.5) * tileSize,
+    (size - 1 - gridPosition[1] - size / 2 + 0.5) * tileSize,
   ]
 
-  const targetWorldPosition = [
-    (targetPosition[0] - size / 2 + 0.5) * tileSize,
-    0.5,
-    (targetPosition[1] - size / 2 + 0.5) * tileSize,
-  ]
+  const characterWorldPosition = getWorldPosition(characterPosition)
+  const targetWorldPosition = getWorldPosition(targetPosition)
 
   useFrame(() => {
-    // Update character position based on target position
     const newX = characterPosition[0] + (targetPosition[0] - characterPosition[0]) * 0.1
     const newZ = characterPosition[1] + (targetPosition[1] - characterPosition[1]) * 0.1
 
@@ -136,7 +141,7 @@ const Ground = ({ size = 8, tileSize = 1 }) => {
   })
 
   return (
-    <group userData={{ isGround: true }}>
+    <group ref={groundRef} userData={{ isGround: true }} onClick={handleClick}>
       {squares}
       <Duck position={characterWorldPosition} targetPosition={targetWorldPosition} />
     </group>
