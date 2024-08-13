@@ -1,16 +1,32 @@
-import { useEffect, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { useGLTF, useAnimations } from '@react-three/drei'
+import React, { useEffect, useRef, useState, useMemo } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useGLTF, useAnimations, Html } from '@react-three/drei'
 import * as THREE from 'three'
+import './styles.css'
 
 export function Character({ position, targetPosition, ...props }) {
   const group = useRef()
-  const { nodes, animations } = useGLTF('/test.glb')
+  const { nodes, animations, materials } = useGLTF('/test.glb')
   const { actions } = useAnimations(animations, group)
+  const [hovered, setHovered] = useState(false)
+  const [clicked, setClicked] = useState(false)
+  const { camera, raycaster, pointer } = useThree()
 
   // Create quaternions for base orientation and rotation
   const baseOrientation = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0))
   const rotationQuaternion = new THREE.Quaternion()
+
+  // Create a bounding sphere for the entire character
+  const boundingSphere = useMemo(() => {
+    const sphere = new THREE.Sphere()
+    const box = new THREE.Box3()
+    if (group.current) {
+      box.setFromObject(group.current)
+      box.getBoundingSphere(sphere)
+    }
+
+    return sphere
+  }, [])
 
   useEffect(() => {
     if (actions.idle) actions.idle.play()
@@ -20,7 +36,9 @@ export function Character({ position, targetPosition, ...props }) {
     if (group.current) {
       // Update position
       group.current.position.lerp(new THREE.Vector3(position[0], position[1], position[2]), 0.1)
-
+      // Update bounding sphere
+      const box = new THREE.Box3().setFromObject(group.current)
+      box.getBoundingSphere(boundingSphere)
       if (targetPosition) {
         const direction = new THREE.Vector3(targetPosition[0] - position[0], 0, targetPosition[2] - position[2])
 
@@ -51,14 +69,66 @@ export function Character({ position, targetPosition, ...props }) {
           }
         }
       }
+
+      raycaster.setFromCamera(pointer, camera)
+
+      const intersects = raycaster.ray.intersectSphere(boundingSphere, new THREE.Vector3())
+
+      if (intersects) {
+        if (!hovered) {
+          setHovered(true)
+          document.body.style.cursor = 'pointer'
+        }
+        // Apply highlight effect
+        group.current.traverse((child) => {
+          if (child.isMesh) {
+            child.material.emissive = new THREE.Color(0x00ff00)
+            child.material.emissiveIntensity = 0.5
+          }
+        })
+      } else if (hovered) {
+        setHovered(false)
+        document.body.style.cursor = 'default'
+        // Reset highlight effect
+        group.current.traverse((child) => {
+          if (child.isMesh) {
+            child.material.emissive = new THREE.Color(0x000000)
+            child.material.emissiveIntensity = 0
+          }
+        })
+      }
     }
   })
 
+  const handleClick = (event) => {
+    event.stopPropagation()
+    console.log('ss')
+    setClicked(!clicked)
+  }
+
   return (
-    <group ref={group} {...props} scale={0.007}>
+    <group ref={group} {...props} scale={0.007} onClick={handleClick}>
       <primitive object={nodes.mixamorigHips} />
-      <skinnedMesh geometry={nodes.Beta_Joints.geometry} skeleton={nodes.Beta_Joints.skeleton} />
-      <skinnedMesh geometry={nodes.Beta_Surface.geometry} skeleton={nodes.Beta_Surface.skeleton} />
+      <skinnedMesh
+        geometry={nodes.Beta_Joints.geometry}
+        skeleton={nodes.Beta_Joints.skeleton}
+        material={materials.Beta_Joints_MAT1}
+      />
+      <skinnedMesh
+        geometry={nodes.Beta_Surface.geometry}
+        skeleton={nodes.Beta_Surface.skeleton}
+        material={materials.Beta_HighLimbsGeoSG3}
+      />
+      {clicked && (
+        <Html distanceFactor={10}>
+          <div className='content'>
+            hello <br />
+            world
+          </div>
+        </Html>
+      )}
     </group>
   )
 }
+
+useGLTF.preload('/test.glb')

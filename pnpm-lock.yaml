@@ -9,7 +9,7 @@ dependencies:
     specifier: ^10.0.0
     version: 10.2.8(next@14.2.5)(webpack@5.93.0)
   '@react-three/drei':
-    specifier: ^9.92.7
+    specifier: ^9.109.5
     version: 9.109.5(@react-three/fiber@8.17.1)(@types/three@0.167.1)(react-dom@18.3.1)(react@18.3.1)(three@0.160.1)
   '@react-three/fiber':
     specifier: ^8.15.12
