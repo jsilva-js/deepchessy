@@ -4,9 +4,9 @@ import { useGLTF, useAnimations, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import './styles.css'
 
-export function Character({ position, targetPosition, ...props }) {
+export function Character({ position, idx, targetPosition, ...props }) {
   const group = useRef()
-  const { nodes, animations, materials } = useGLTF('/test.glb')
+  const { nodes, animations, materials } = useGLTF('/test' + idx + '.glb')
   const { actions } = useAnimations(animations, group)
   const [hovered, setHovered] = useState(false)
   const [clicked, setClicked] = useState(false)
@@ -37,6 +37,8 @@ export function Character({ position, targetPosition, ...props }) {
       group.current.position.lerp(new THREE.Vector3(position[0], position[1], position[2]), 0.1)
       const box = new THREE.Box3().setFromObject(group.current)
       box.getBoundingSphere(boundingSphere)
+      boundingSphere.radius = Math.max(boundingSphere.radius, 0.6) // Set a minimum radius
+
       if (targetPosition) {
         const direction = new THREE.Vector3(targetPosition[0] - position[0], 0, targetPosition[2] - position[2])
 
@@ -106,7 +108,7 @@ export function Character({ position, targetPosition, ...props }) {
   return (
     <group ref={group} {...props} scale={0.007} onClick={handleClick}>
       {clicked && (
-        <Html distanceFactor={10} occlude>
+        <Html distanceFactor={10}>
           <div className='content'>
             hello <br />
             world
