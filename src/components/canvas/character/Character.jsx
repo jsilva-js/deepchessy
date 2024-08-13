@@ -16,7 +16,6 @@ export function Character({ position, targetPosition, ...props }) {
   const baseOrientation = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0))
   const rotationQuaternion = new THREE.Quaternion()
 
-  // Create a bounding sphere for the entire character
   const boundingSphere = useMemo(() => {
     const sphere = new THREE.Sphere()
     const box = new THREE.Box3()
@@ -36,7 +35,6 @@ export function Character({ position, targetPosition, ...props }) {
     if (group.current) {
       // Update position
       group.current.position.lerp(new THREE.Vector3(position[0], position[1], position[2]), 0.1)
-      // Update bounding sphere
       const box = new THREE.Box3().setFromObject(group.current)
       box.getBoundingSphere(boundingSphere)
       if (targetPosition) {
@@ -69,7 +67,7 @@ export function Character({ position, targetPosition, ...props }) {
           }
         }
       }
-
+      // Raycasting
       raycaster.setFromCamera(pointer, camera)
 
       const intersects = raycaster.ray.intersectSphere(boundingSphere, new THREE.Vector3())
@@ -102,12 +100,19 @@ export function Character({ position, targetPosition, ...props }) {
 
   const handleClick = (event) => {
     event.stopPropagation()
-    console.log('ss')
     setClicked(!clicked)
   }
 
   return (
     <group ref={group} {...props} scale={0.007} onClick={handleClick}>
+      {clicked && (
+        <Html distanceFactor={10} occlude>
+          <div className='content'>
+            hello <br />
+            world
+          </div>
+        </Html>
+      )}
       <primitive object={nodes.mixamorigHips} />
       <skinnedMesh
         geometry={nodes.Beta_Joints.geometry}
@@ -119,14 +124,6 @@ export function Character({ position, targetPosition, ...props }) {
         skeleton={nodes.Beta_Surface.skeleton}
         material={materials.Beta_HighLimbsGeoSG3}
       />
-      {clicked && (
-        <Html distanceFactor={10}>
-          <div className='content'>
-            hello <br />
-            world
-          </div>
-        </Html>
-      )}
     </group>
   )
 }
