@@ -37,7 +37,8 @@ export function Character({ position, idx, targetPosition, ...props }) {
       group.current.position.lerp(new THREE.Vector3(position[0], position[1], position[2]), 0.1)
       const box = new THREE.Box3().setFromObject(group.current)
       box.getBoundingSphere(boundingSphere)
-      boundingSphere.radius = Math.max(boundingSphere.radius, 0.6) // Set a minimum radius
+      boundingSphere.center.y = 0.5
+      boundingSphere.radius = Math.max(boundingSphere.radius, 0.7) // Set a minimum radius
 
       if (targetPosition) {
         const direction = new THREE.Vector3(targetPosition[0] - position[0], 0, targetPosition[2] - position[2])
@@ -101,20 +102,13 @@ export function Character({ position, idx, targetPosition, ...props }) {
   })
 
   const handleClick = (event) => {
+    console.log(event)
     event.stopPropagation()
     setClicked(!clicked)
   }
 
   return (
     <group ref={group} {...props} scale={0.007} onClick={handleClick}>
-      {clicked && (
-        <Html distanceFactor={10}>
-          <div className='content'>
-            hello <br />
-            world
-          </div>
-        </Html>
-      )}
       <primitive object={nodes.mixamorigHips} />
       <skinnedMesh
         geometry={nodes.Beta_Joints.geometry}
@@ -126,6 +120,14 @@ export function Character({ position, idx, targetPosition, ...props }) {
         skeleton={nodes.Beta_Surface.skeleton}
         material={materials.Beta_HighLimbsGeoSG3}
       />
+      {clicked && (
+        <Html distanceFactor={10}>
+          <div className='content'>
+            hello <br />
+            world
+          </div>
+        </Html>
+      )}
     </group>
   )
 }
